@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Triangle Quiz</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f8f8f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+.card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.09);padding:2rem;max-width:500px;width:100%}
+.set-label{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#888;margin-bottom:1.2rem}
+.role{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-bottom:8px}
+.role-a{background:#EFF6FF;color:#1D4ED8}
+.role-b{background:#F5F3FF;color:#6D28D9}
+.problem{font-size:16px;line-height:1.7;color:#1a1a1a;margin-bottom:1.5rem;padding:14px;background:#fafaf8;border-radius:10px;border:1px solid #eee}
+.divider{height:1px;background:#eee;margin:1.2rem 0}
+.seek-label{font-size:13px;color:#555;margin-bottom:10px}
+input[type=text]{width:100%;padding:11px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:15px;outline:none;transition:border .15s}
+input[type=text]:focus{border-color:#6366F1}
+input:disabled{background:#f3f3f3;color:#999}
+.btn{display:block;width:100%;margin-top:10px;padding:12px;border:none;border-radius:10px;background:#6366F1;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn:hover:not(:disabled){background:#4F46E5}
+.btn:disabled{background:#ccc;cursor:default}
+.feedback{margin-top:12px;padding:12px 14px;border-radius:10px;font-size:14px;line-height:1.5;display:none}
+.fb-correct{background:#DCFCE7;color:#15803D;display:block}
+.fb-wrong{background:#FEF3C7;color:#92400E;display:block}
+
+/* Celebration overlay */
+.celebration{display:none;position:relative;margin-top:16px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#FEF9C3,#FDF4FF);border:1.5px solid #E9D5FF;padding:20px;text-align:center}
+.celebration.show{display:block;animation:popIn .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes popIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:scale(1)}}
+.celeb-title{font-size:15px;font-weight:700;color:#3730A3;margin-bottom:14px}
+.rewards-row{display:flex;justify-content:center;gap:24px}
+.reward-item{display:flex;flex-direction:column;align-items:center;gap:6px}
+.reward-icon{font-size:36px;animation:bounce .6s ease infinite alternate}
+.reward-icon.elixir{animation-delay:.15s}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-6px)}}
+.reward-label{font-size:12px;font-weight:600;color:#6D28D9}
+.reward-count{font-size:20px;font-weight:800;color:#1a1a1a}
+.no-elixir{font-size:12px;color:#9CA3AF;margin-top:8px}
+.confetti{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.confetti span{position:absolute;width:8px;height:8px;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{0%{opacity:1;top:-10px;transform:rotate(0deg)}100%{opacity:0;top:110%;transform:rotate(360deg)}}
+
+/* Solution */
+.solution-box{margin-top:16px;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:12px;padding:16px;display:none}
+.solution-box h3{font-size:13px;font-weight:700;color:#15803D;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.step{display:flex;gap:10px;margin-bottom:10px;align-items:flex-start}
+.step-num{min-width:22px;height:22px;border-radius:50%;background:#15803D;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-text{font-size:13px;line-height:1.65;color:#166534}
+.step-text strong{color:#14532D}
+.final-ans{margin-top:10px;padding:8px 12px;background:#DCFCE7;border-radius:8px;font-size:13px;font-weight:700;color:#14532D;text-align:center}
+#error-page{text-align:center;padding:2rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="content"></div>
+</div>
+
+<script>
+const ENCOURAGEMENT = [
+  ["Not quite — you've got this! Take another look. 💪","Keep going! Every attempt makes you sharper. 🔍","You're thinking in the right direction — try once more! 🌟","Don't stop now — great mathematicians persist! 🚀"],
+  ["So close! Check your calculation one more time. 😊","Almost there — review your steps carefully. You can do it! 🎯","A small slip somewhere — you're nearly there! Keep pushing! 💫","Brilliant effort! Try once more and trust your process. ✨"],
+  ["Really impressive persistence! Here's a hint to guide you — ","You've tried hard — use this hint and finish strong: ","Wonderful determination! With this hint you'll nail it: ","Your resilience is amazing! One more try with this clue: "]
+];
+
+const ELIXIR_RATES = {yellow:0.20, blue:0.40, green:0.60};
+const CONFETTI_COLORS = ['#FCD34D','#A78BFA','#34D399','#F472B6','#60A5FA','#FB923C'];
+
+const DATA = {
+  yellow:{label:"Tier 1",sets:[
+    {a:"∠A = 40°, ∠B = 60°. What is the measure of ∠C?",b:"Find ∠C.",ans:"80",
+     steps:["The Angle Sum Theorem: all angles in a triangle add up to <strong>180°</strong>.","Write the equation: ∠A + ∠B + ∠C = 180°","Substitute: 40° + 60° + ∠C = 180°","Simplify: 100° + ∠C = 180°","Subtract 100° from both sides."],final:"∠C = 80°"},
+    {a:"∠A = 90°, ∠C = 45°. Find the missing ∠B.",b:"Find ∠B.",ans:"45",
+     steps:["Angle Sum Theorem: ∠A + ∠B + ∠C = 180°","Substitute: 90° + ∠B + 45° = 180°","Simplify: 135° + ∠B = 180°","Subtract 135° from both sides."],final:"∠B = 45°"},
+    {a:"Side lengths are 4 cm, 9 cm, and 5 cm.",b:"Can these form a triangle? Answer Yes or No. (Hint: a + b > c)",ans:"no",
+     steps:["Triangle Inequality: sum of any two sides must be <strong>strictly greater</strong> than the third.","Check: 4 + 5 = 9 — is 9 > 9? <strong>No!</strong>","4 + 9 = 13 > 5 ✓ and 5 + 9 = 14 > 4 ✓","Since the first check fails, no triangle is possible."],final:"No — triangle inequality not satisfied."},
+    {a:"∠B = 110°, ∠C = 30°. Calculate the third angle ∠A.",b:"Find ∠A.",ans:"40",
+     steps:["Angle Sum Theorem: ∠A + ∠B + ∠C = 180°","Substitute: ∠A + 110° + 30° = 180°","Simplify: ∠A + 140° = 180°","Subtract 140° from both sides."],final:"∠A = 40°"},
+    {a:"Proportion: x/10 = 5/2. Solve for x (cross-multiply).",b:"Find x.",ans:"25",
+     steps:["Write the proportion: x/10 = 5/2","Cross-multiply: x × 2 = 10 × 5","Simplify: 2x = 50","Divide both sides by 2."],final:"x = 25"},
+    {a:"Side lengths are 6 cm, 6 cm, and 6 cm.",b:"What type of triangle? (Equilateral or Isosceles)",ans:"equilateral",
+     steps:["Count equal sides: all three sides = 6 cm.","Equilateral = all 3 sides equal. Isosceles = only 2 sides equal.","Since all 3 are the same, this is equilateral.","Bonus: each angle in an equilateral triangle = 60°."],final:"Equilateral triangle"},
+    {a:"∠A = 35°, ∠B = 15°. Find ∠C.",b:"Find the measure of ∠C.",ans:"130",
+     steps:["Angle Sum Theorem: ∠A + ∠B + ∠C = 180°","Substitute: 35° + 15° + ∠C = 180°","Simplify: 50° + ∠C = 180°","Subtract 50° from both sides."],final:"∠C = 130°"},
+    {a:"Side lengths are 7 cm, 4 cm, and 2 cm.",b:"Why can't these form a triangle?",ans:"4+2<7",
+     steps:["Check the two shortest sides: 4 cm and 2 cm.","4 + 2 = 6. Is 6 > 7? <strong>No.</strong>","The sum of the shorter sides must exceed the longest side."],final:"4 + 2 = 6 < 7 — no triangle possible."},
+    {a:"∠A = 63.5°, ∠B = 26.5°. Is this a right triangle?",b:"Yes or No.",ans:"yes",
+     steps:["Find ∠C: 180° − 63.5° − 26.5° = 90°","∠C = 90°","A triangle with one 90° angle is a <strong>right triangle</strong>."],final:"Yes — ∠C = 90°"},
+    {a:"a / sin 30° = 10 / sin 90°. (sin 30° = 0.5, sin 90° = 1)",b:"Solve for a.",ans:"5",
+     steps:["Write the proportion: a / sin 30° = 10 / sin 90°","Cross-multiply: a × sin 90° = 10 × sin 30°","Substitute: a × 1 = 10 × 0.5","Simplify."],final:"a = 5"},
+    {a:"∠A = 57°, ∠C = 43°. What is the measurement of ∠B?",b:"Find ∠B.",ans:"80",
+     steps:["Angle Sum Theorem: ∠A + ∠B + ∠C = 180°","Substitute: 57° + ∠B + 43° = 180°","Simplify: 100° + ∠B = 180°","Subtract 100°."],final:"∠B = 80°"},
+    {a:"Side lengths are 5 cm, 5 cm, and 8 cm.",b:"How many congruent sides are there?",ans:"2",
+     steps:["List sides: 5 cm, 5 cm, 8 cm.","Compare pairs: 5 = 5 ✓ — these two are congruent.","The third side (8 cm) is different.","This is an <strong>Isosceles</strong> triangle."],final:"2 congruent sides"},
+  ]},
+  blue:{label:"Tier 2",sets:[
+    {a:"a = 4, ∠A = 43°, ∠C = 57°.",b:"Find side c using the Law of Sines.",ans:"4.92",
+     steps:["Law of Sines: a / sin A = c / sin C","Substitute: 4 / sin 43° = c / sin 57°","Rearrange: c = 4 × sin 57° / sin 43°","c = 4 × 0.8387 / 0.6820 = 3.3548 / 0.6820"],final:"c ≈ 4.92"},
+    {a:"c = 5, ∠A = 35°, ∠B = 15°.",b:"Step 1: Find ∠C. Step 2: Solve for side a.",ans:"3.74",
+     steps:["<strong>Step 1:</strong> ∠C = 180° − 35° − 15° = 130°","<strong>Step 2:</strong> a / sin A = c / sin C","a = 5 × sin 35° / sin 130°","a = 5 × 0.5736 / 0.7660 = 2.868 / 0.7660"],final:"a ≈ 3.74"},
+    {a:"∠A = 30°, ∠B = 126.7°, a = 2.48.",b:"Solve for b using b = (a · sin B) / sin A.",ans:"3.97",
+     steps:["Use the given formula: b = (a · sin B) / sin A","Substitute: b = (2.48 × sin 126.7°) / sin 30°","sin 126.7° ≈ 0.8004, sin 30° = 0.5","b = (2.48 × 0.8004) / 0.5 = 1.985 / 0.5"],final:"b ≈ 3.97"},
+    {a:"b = 11.82, ∠A = 100°, ∠B = 30°.",b:"Find side a using the Law of Sines.",ans:"23.28",
+     steps:["Law of Sines: a / sin A = b / sin B","Rearrange: a = b × sin A / sin B","Substitute: a = 11.82 × sin 100° / sin 30°","a = 11.82 × 0.9848 / 0.5 = 11.64 / 0.5"],final:"a ≈ 23.28"},
+    {a:"∠A = 43°, ∠C = 57°, a = 4.56.",b:"Solve for b. (Find ∠B first.)",ans:"6.58",
+     steps:["<strong>Step 1:</strong> ∠B = 180° − 43° − 57° = 80°","<strong>Step 2:</strong> b = a × sin B / sin A","b = 4.56 × sin 80° / sin 43°","b = 4.56 × 0.9848 / 0.6820 = 4.491 / 0.6820"],final:"b ≈ 6.58"},
+    {a:"a = 10, ∠A = 120°, ∠B = 37.3°.",b:"Find side b using the Law of Sines.",ans:"7",
+     steps:["Law of Sines: b = a × sin B / sin A","Substitute: b = 10 × sin 37.3° / sin 120°","sin 37.3° ≈ 0.6060, sin 120° ≈ 0.8660","b = 10 × 0.6060 / 0.8660 = 6.060 / 0.8660"],final:"b ≈ 7"},
+    {a:"∠A = 60°, ∠B = 45°, a = 20.",b:"Calculate side b using the Law of Sines.",ans:"16.33",
+     steps:["Law of Sines: b = a × sin B / sin A","Substitute: b = 20 × sin 45° / sin 60°","sin 45° ≈ 0.7071, sin 60° ≈ 0.8660","b = 20 × 0.7071 / 0.8660 = 14.142 / 0.8660"],final:"b ≈ 16.33"},
+    {a:"c = 9.19, ∠A = 100°, ∠C = 50°.",b:"Solve for side a using the Law of Sines.",ans:"11.82",
+     steps:["Law of Sines: a = c × sin A / sin C","Substitute: a = 9.19 × sin 100° / sin 50°","sin 100° ≈ 0.9848, sin 50° ≈ 0.7660","a = 9.19 × 0.9848 / 0.7660 = 9.050 / 0.7660"],final:"a ≈ 11.82"},
+    {a:"∠B = 80°, ∠C = 57°, b = 6.58.",b:"Find side c using the Law of Sines.",ans:"5.61",
+     steps:["Law of Sines: c = b × sin C / sin B","Substitute: c = 6.58 × sin 57° / sin 80°","sin 57° ≈ 0.8387, sin 80° ≈ 0.9848","c = 6.58 × 0.8387 / 0.9848 = 5.519 / 0.9848"],final:"c ≈ 5.61"},
+    {a:"a = 8.12, ∠A = 35°, ∠C = 130°.",b:"Solve for side c using the Law of Sines.",ans:"10.84",
+     steps:["Law of Sines: c = a × sin C / sin A","Substitute: c = 8.12 × sin 130° / sin 35°","sin 130° ≈ 0.7660, sin 35° ≈ 0.5736","c = 8.12 × 0.7660 / 0.5736 = 6.220 / 0.5736"],final:"c ≈ 10.84"},
+    {a:"∠A = 45°, ∠B = 45°, c = 10.",b:"Find side a. (Is this a special right triangle?)",ans:"7.07",
+     steps:["Find ∠C: 180° − 45° − 45° = 90° → Yes, a 45-45-90 triangle!","Law of Sines: a = c × sin A / sin C","a = 10 × sin 45° / sin 90°","a = 10 × 0.7071 / 1"],final:"a ≈ 7.07"},
+    {a:"b = 13.8, ∠B = 79.3°, ∠C = 23.9°.",b:"Calculate side c using the Law of Sines.",ans:"5.69",
+     steps:["Law of Sines: c = b × sin C / sin B","Substitute: c = 13.8 × sin 23.9° / sin 79.3°","sin 23.9° ≈ 0.4051, sin 79.3° ≈ 0.9823","c = 13.8 × 0.4051 / 0.9823 = 5.590 / 0.9823"],final:"c ≈ 5.69"},
+  ]},
+  green:{label:"Tier 3",sets:[
+    {a:"A tower is 50 ft high. The angle of elevation is 41°.",b:"Find the distance from observer to the base (ft).",ans:"57.52",
+     steps:["The tower = opposite side (50 ft), ground distance = adjacent.","Use: tan θ = opposite / adjacent → tan 41° = 50 / d","Rearrange: d = 50 / tan 41°","tan 41° ≈ 0.8693"],final:"d ≈ 57.52 ft"},
+    {a:"∠A = 30°, b = 4, a = 2. (SSA Case)",b:"How many triangles exist? Find ∠B.",ans:"90",
+     steps:["Law of Sines: sin B = b × sin A / a","sin B = 4 × sin 30° / 2 = 4 × 0.5 / 2 = 1.0","sin B = 1 → ∠B = 90°","Exactly one triangle (right-angle case).","∠C = 180° − 30° − 90° = 60°"],final:"One triangle: ∠B = 90°"},
+    {a:"A kite is 12 m high. Person R sees it at 35° elevation.",b:"Find the string length from R to the kite (m).",ans:"20.92",
+     steps:["Height (12 m) = opposite; string = hypotenuse.","sin 35° = 12 / string","string = 12 / sin 35°","sin 35° ≈ 0.5736"],final:"String ≈ 20.92 m"},
+    {a:"Airplane height = 4 km, horizontal ground distance = 6 km.",b:"Calculate the angle of depression α.",ans:"33.69",
+     steps:["Angle of depression = angle of elevation from ground.","tan α = opposite / adjacent = 4 / 6 = 0.6667","α = arctan(0.6667)"],final:"α ≈ 33.69°"},
+    {a:"a = 5, b = 3, c = 6.",b:"Find angle ∠A using the Law of Cosines.",ans:"56.3",
+     steps:["Law of Cosines: cos A = (b² + c² − a²) / (2bc)","Substitute: cos A = (9 + 36 − 25) / (2 × 3 × 6)","cos A = 20 / 36 = 0.5556","A = arccos(0.5556)"],final:"∠A ≈ 56.3°"},
+    {a:"A flagpole is 22.5 m high. Its shadow is 34 m long.",b:"What is the sun's angle of elevation (°)?",ans:"33.5",
+     steps:["Flagpole (22.5 m) = opposite; shadow (34 m) = adjacent.","tan θ = 22.5 / 34 = 0.6618","θ = arctan(0.6618)"],final:"θ ≈ 33.5°"},
+    {a:"∠A = 30°, b = 10, a = 4.",b:"Does a triangle exist? Compare a to b · sin A. (Yes or No)",ans:"no",
+     steps:["Find minimum height: h = b × sin A = 10 × 0.5 = 5","Compare a to h: a = 4, h = 5","Since a < h (4 < 5), the side is too short to reach the base."],final:"No triangle exists (a < b · sin A)"},
+    {a:"Two ships from port: Ship A = 10 km, Ship B = 7 km, angle between = 120°.",b:"Find the distance between the ships (km).",ans:"14.76",
+     steps:["Law of Cosines: c² = a² + b² − 2ab · cos C","c² = 100 + 49 − 2(10)(7) × cos 120°","cos 120° = −0.5, so: c² = 149 − 140 × (−0.5) = 149 + 70 = 219","c = √219"],final:"c ≈ 14.76 km"},
+    {a:"A ladder reaches 8.66 ft up a wall at a 60° angle.",b:"How long is the ladder (ft)?",ans:"10",
+     steps:["Wall (8.66 ft) = opposite; ladder = hypotenuse.","sin 60° = 8.66 / ladder","ladder = 8.66 / sin 60°","sin 60° ≈ 0.8660"],final:"Ladder ≈ 10 ft"},
+    {a:"∠A = 30°, b = 10, a = 12.",b:"How many triangles are possible? (1 or 2)",ans:"1",
+     steps:["In SSA: compare a and b.","a = 12, b = 10 → a > b","Rule: if a ≥ b, exactly <strong>one triangle</strong> exists.","Also: a = 12 > b · sin A = 5 ✓"],final:"1 triangle"},
+    {a:"∠A = 35°, b = 1.69, c = 5.",b:"Solve for side a using the Law of Cosines.",ans:"3.74",
+     steps:["Law of Cosines: a² = b² + c² − 2bc · cos A","a² = 1.69² + 5² − 2(1.69)(5) × cos 35°","a² = 2.856 + 25 − 16.9 × 0.8192","a² = 27.856 − 13.844 = 14.012","a = √14.012"],final:"a ≈ 3.74"},
+    {a:"A bird on a lamppost. Depression angle = 35°, horizontal distance = 25 m.",b:"How tall is the lamppost (m)?",ans:"17.5",
+     steps:["Angle of depression = angle of elevation = 35°.","Horizontal (25 m) = adjacent; height = opposite.","tan 35° = h / 25","h = 25 × tan 35° = 25 × 0.7002"],final:"h ≈ 17.5 m"},
+  ]}
+};
+
+function numericMatch(val, ans, tier){
+  const cv = parseFloat(ans);
+  if(isNaN(cv)) return val.toLowerCase().trim() === ans.toLowerCase().trim();
+  const uv = parseFloat(val.replace(',',''));
+  if(isNaN(uv)) return false;
+  const tol = tier==='yellow'?0.6:tier==='blue'?0.1:0.15;
+  return Math.abs(uv-cv) <= Math.abs(cv)*tol + 0.5;
+}
+
+function randomMsg(attempt){
+  const pool = ENCOURAGEMENT[Math.min(attempt-1, ENCOURAGEMENT.length-1)];
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+function spawnConfetti(container){
+  for(let i=0;i<18;i++){
+    const s = document.createElement('span');
+    s.style.cssText = `left:${Math.random()*100}%;background:${CONFETTI_COLORS[i%CONFETTI_COLORS.length]};animation-duration:${0.8+Math.random()*0.8}s;animation-delay:${Math.random()*0.3}s;border-radius:${Math.random()>0.5?'50%':'2px'}`;
+    container.appendChild(s);
+    setTimeout(()=>s.remove(), 1800);
+  }
+}
+
+function render(){
+  const p = new URLSearchParams(window.location.search);
+  const tier = p.get('tier');
+  const setIdx = parseInt(p.get('set'))-1;
+  const el = document.getElementById('content');
+
+  if(!tier||!DATA[tier]||isNaN(setIdx)||setIdx<0||setIdx>=12){
+    el.innerHTML='<div id="error-page"><h2 style="color:#dc2626;margin-bottom:8px">Invalid QR Code</h2><p style="color:#666">Please scan your assigned QR code again.</p></div>';
+    return;
+  }
+
+  const d = DATA[tier];
+  const s = d.sets[setIdx];
+  const elixirRate = ELIXIR_RATES[tier];
+  let attempts = 0, solved = false;
+
+  el.innerHTML = `
+    <div class="set-label">Set ${setIdx+1} of 12</div>
+    <div><span class="role role-a">Student A — The Giver</span></div>
+    <div class="problem">${s.a}</div>
+    <div class="divider"></div>
+    <div><span class="role role-b">Student B — The Seeker</span></div>
+    <p class="seek-label" style="margin-bottom:10px">${s.b}</p>
+    <input type="text" id="ans-input" placeholder="Type your answer here…" autocomplete="off">
+    <button class="btn" id="check-btn">Check Answer</button>
+    <div class="feedback" id="feedback"></div>
+    <div class="celebration" id="celebration">
+      <div class="confetti" id="confetti"></div>
+      <div class="celeb-title" id="celeb-title"></div>
+      <div class="rewards-row" id="rewards-row"></div>
+      <div class="no-elixir" id="no-elixir"></div>
+    </div>
+    <div class="solution-box" id="sol-box">
+      <h3>Step-by-step solution</h3>
+      ${s.steps.map((st,i)=>`<div class="step"><div class="step-num">${i+1}</div><div class="step-text">${st}</div></div>`).join('')}
+      <div class="final-ans">∴ ${s.final}</div>
+    </div>
+  `;
+
+  const inp = document.getElementById('ans-input');
+  const btn = document.getElementById('check-btn');
+  const fb  = document.getElementById('feedback');
+
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') check(); });
+  btn.addEventListener('click', check);
+
+  function check(){
+    if(solved) return;
+    const val = inp.value.trim();
+    if(!val) return;
+    attempts++;
+
+    if(numericMatch(val, s.ans, tier)){
+      solved = true;
+      inp.disabled = true;
+      btn.disabled = true;
+
+      fb.className = 'feedback fb-correct';
+      fb.textContent = '✓ Correct! Fantastic work! 🎉';
+      fb.style.display = 'block';
+
+      const gotElixir = Math.random() < elixirRate;
+
+      // Build celebration
+      const celeb = document.getElementById('celebration');
+      document.getElementById('celeb-title').textContent = attempts===1
+        ? '🌟 First try — incredible!' : '✅ Correct answer!';
+
+      const rr = document.getElementById('rewards-row');
+      rr.innerHTML = `
+        <div class="reward-item">
+          <div class="reward-icon">🪙</div>
+          <div class="reward-count">1</div>
+          <div class="reward-label">Gold Coin</div>
+        </div>
+        ${gotElixir ? `<div class="reward-item">
+          <div class="reward-icon elixir">🧪</div>
+          <div class="reward-count">1</div>
+          <div class="reward-label">Elixir</div>
+        </div>` : ''}
+      `;
+
+      // Gold coin only on first try; no coin if not first try
+      if(attempts > 1){
+        rr.innerHTML = `<div style="font-size:13px;color:#6B7280;padding:4px 0">No coin this time — first-try only! Keep pushing. 💪</div>`;
+        document.getElementById('celeb-title').textContent = '✅ Correct answer!';
+      }
+
+      if(attempts === 1 && !gotElixir){
+        document.getElementById('no-elixir').textContent = 'No elixir this time — better luck next set!';
+      }
+
+      celeb.classList.add('show');
+      if(attempts === 1) spawnConfetti(document.getElementById('confetti'));
+      document.getElementById('sol-box').style.display = 'block';
+
+    } else {
+      const msg = randomMsg(attempts);
+      fb.className = 'feedback fb-wrong';
+      fb.textContent = attempts >= 3 ? msg + (s.hint||'') : msg;
+      fb.style.display = 'block';
+    }
+  }
+}
+
+render();
+</script>
+</body>
+</html>
