@@ -154,8 +154,11 @@ function numericMatch(val, ans, tier){
   if(isNaN(cv)) return val.toLowerCase().trim() === ans.toLowerCase().trim();
   const uv = parseFloat(val.replace(',',''));
   if(isNaN(uv)) return false;
-  const tol = tier==='yellow'?0.6:tier==='blue'?0.1:0.15;
-  return Math.abs(uv-cv) <= Math.abs(cv)*tol + 0.5;
+  // Yellow: ±0.5 flat tolerance (for whole-number or near-whole answers)
+  // Blue: ±10% relative tolerance only (no flat padding)
+  // Green: ±10% relative tolerance only (no flat padding)
+  if(tier === 'yellow') return Math.abs(uv - cv) <= 0.5;
+  return Math.abs(uv - cv) <= Math.abs(cv) * 0.1;
 }
 
 function randomMsg(attempt){
