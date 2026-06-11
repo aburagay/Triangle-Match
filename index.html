@@ -154,11 +154,10 @@ function numericMatch(val, ans, tier){
   if(isNaN(cv)) return val.toLowerCase().trim() === ans.toLowerCase().trim();
   const uv = parseFloat(val.replace(',',''));
   if(isNaN(uv)) return false;
-  // Yellow: ±0.5 flat tolerance (for whole-number or near-whole answers)
-  // Blue: ±10% relative tolerance only (no flat padding)
-  // Green: ±10% relative tolerance only (no flat padding)
-  if(tier === 'yellow') return Math.abs(uv - cv) <= 0.5;
-  return Math.abs(uv - cv) <= Math.abs(cv) * 0.1;
+  // All tiers: fixed ±0.05 tolerance
+  // Accepts normal calculator rounding (e.g. 5.69, 5.690, 5.7)
+  // Rejects answers off by more than 0.05 (e.g. 5 or 6 for answer 5.69)
+  return Math.abs(uv - cv) <= 0.05;
 }
 
 function randomMsg(attempt){
